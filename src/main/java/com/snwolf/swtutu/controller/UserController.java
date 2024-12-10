@@ -9,10 +9,7 @@ import com.snwolf.swtutu.common.ResultUtils;
 import com.snwolf.swtutu.constant.UserConstant;
 import com.snwolf.swtutu.exception.ErrorCode;
 import com.snwolf.swtutu.exception.ThrowUtils;
-import com.snwolf.swtutu.model.dto.user.UserAddRequest;
-import com.snwolf.swtutu.model.dto.user.UserLoginRequest;
-import com.snwolf.swtutu.model.dto.user.UserQueryRequest;
-import com.snwolf.swtutu.model.dto.user.UserRegisterRequest;
+import com.snwolf.swtutu.model.dto.user.*;
 import com.snwolf.swtutu.model.entity.User;
 import com.snwolf.swtutu.model.vo.LoginUserVO;
 import com.snwolf.swtutu.model.vo.UserVO;
@@ -30,6 +27,12 @@ public class UserController {
 
     @Resource
     private UserService userService;
+
+    @PostMapping("/testAuthCheck")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> testAuthCheck() {
+        return ResultUtils.success(true);
+    }
 
     @PostMapping("/register")
     public BaseResponse<Long> register(@RequestBody UserRegisterRequest userRegisterRequest) {
@@ -65,6 +68,51 @@ public class UserController {
         final String DEFAULT_PASSWORD = "12345678";
         user.setUserPassword(userService.getEncryptPassword(DEFAULT_PASSWORD));
         return ResultUtils.success(userService.save(user));
+    }
+
+    /**
+     * 根据id获取用户 (仅管理员)
+     * @param id
+     * @return
+     */
+    @GetMapping("/get")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<User> getUserById(long id) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR, "id不能小于0");
+        User user = userService.getById(id);
+        ThrowUtils.throwIf(ObjectUtil.isNull(user), ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        return ResultUtils.success(user);
+    }
+
+    /**
+     * 根据id获取用户包装类
+     * @param id
+     * @return
+     */
+    @GetMapping("/vo/get")
+    public BaseResponse<UserVO> getUserVOById(long id) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR, "id不能小于0");
+        User user = userService.getById(id);
+        ThrowUtils.throwIf(ObjectUtil.isNull(user), ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+        return ResultUtils.success(userService.getUserVO(user));
+    }
+
+    @DeleteMapping("/delete")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> deleteUser(long id) {
+        ThrowUtils.throwIf(id <= 0, ErrorCode.PARAMS_ERROR, "id不能小于0");
+        return ResultUtils.success(userService.removeById(id));
+    }
+
+    @PostMapping("/update")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
+        ThrowUtils.throwIf(ObjectUtil.isNull(userUpdateRequest), ErrorCode.PARAMS_ERROR, "参数不能为空");
+        User user = new User();
+        BeanUtil.copyProperties(userUpdateRequest, user);
+        boolean result = userService.updateById(user);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(result);
     }
 
     @PostMapping("/list/page/vo")

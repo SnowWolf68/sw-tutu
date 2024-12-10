@@ -1,3 +1,4 @@
+use tutu;
 CREATE TABLE `user` (
         `id` bigint NOT NULL AUTO_INCREMENT COMMENT 'id',
         `user_account` varchar(256) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '账号',
