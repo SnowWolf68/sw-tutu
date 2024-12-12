@@ -114,10 +114,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>
         // 判断是否已经登录
         Object userObj = request.getSession().getAttribute(UserConstant.USER_LOGIN_STATE);
         User currentUser = (User) userObj;
-        Long currentUserId = currentUser.getId();
-        ThrowUtils.throwIf(ObjectUtil.isNull(currentUser) || ObjectUtil.isNull(currentUserId), ErrorCode.NOT_LOGIN_ERROR);
+        ThrowUtils.throwIf(ObjectUtil.isNull(currentUser) || ObjectUtil.isNull(currentUser.getId()), ErrorCode.NOT_LOGIN_ERROR);
         // 从数据库中查询, 避免session中的缓存不一致
-        currentUser = this.getById(currentUserId);
+        currentUser = this.getById(currentUser.getId());
         ThrowUtils.throwIf(ObjectUtil.isNull(currentUser), ErrorCode.NOT_LOGIN_ERROR);
         return currentUser;
     }

@@ -1,5 +1,7 @@
 package com.snwolf.swtutu.model.vo;
 
+import cn.hutool.core.bean.BeanUtil;
+import com.snwolf.swtutu.model.entity.User;
 import lombok.Data;
 
 import java.util.Date;
@@ -46,4 +48,16 @@ public class UserVO {
      * 创建时间
      */
     private Date createTime;
+
+    public static UserVO objToVO(User user){
+        UserVO userVO = new UserVO();
+        BeanUtil.copyProperties(user, userVO);
+        return userVO;
+    }
+
+    public static User VOToObj(UserVO userVO){
+        User user = new User();
+        BeanUtil.copyProperties(userVO, user);
+        return user;
+    }
 }

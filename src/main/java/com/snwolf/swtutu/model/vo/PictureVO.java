@@ -31,6 +31,8 @@ public class PictureVO {
 
     private Long picSize;
 
+    private Long userId;
+
     private Integer picWidth;
 
     private Integer picHeight;
@@ -47,14 +49,14 @@ public class PictureVO {
 
     private Date updateTime;
 
-    public static PictureVO ObjToVO(Picture picture){
+    public static PictureVO objToVO(Picture picture){
         PictureVO pictureVO = new PictureVO();
         BeanUtil.copyProperties(picture, pictureVO);
         pictureVO.setTags(JSONUtil.toList(picture.getTags(), String.class));
         return pictureVO;
     }
 
-    public static Picture VOToObj(PictureVO pictureVO){
+    public static Picture voToObj(PictureVO pictureVO){
         Picture picture = new Picture();
         BeanUtil.copyProperties(pictureVO, picture);
         picture.setTags(JSONUtil.toJsonStr(pictureVO.getTags()));
