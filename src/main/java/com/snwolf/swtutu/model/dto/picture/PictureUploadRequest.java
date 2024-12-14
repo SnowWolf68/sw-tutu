@@ -12,4 +12,9 @@ import lombok.Data;
 public class PictureUploadRequest {
 
     private Long id;
+
+    /**
+     * 上传到数据库中的图片名称
+     */
+    private String picName;
 }

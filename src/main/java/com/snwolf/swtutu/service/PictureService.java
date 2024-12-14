@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureReviewRequest;
+import com.snwolf.swtutu.model.dto.picture.PictureUploadByBatchRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
 import com.snwolf.swtutu.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
@@ -85,4 +86,13 @@ public interface PictureService extends IService<Picture> {
      * @param loginUser
      */
     void fillReviewParam(Picture picture, User loginUser);
+
+    /**
+     * 批量上传图片
+     *
+     * @param pictureUploadByBatchRequest
+     * @param request
+     * @return
+     */
+    Integer UploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, HttpServletRequest request);
 }

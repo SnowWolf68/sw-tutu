@@ -11,16 +11,14 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.snwolf.swtutu.constant.CommonConstant;
 import com.snwolf.swtutu.constant.UserConstant;
+import com.snwolf.swtutu.exception.BusinessException;
 import com.snwolf.swtutu.exception.ErrorCode;
 import com.snwolf.swtutu.exception.ThrowUtils;
 import com.snwolf.swtutu.manager.FileManager;
 import com.snwolf.swtutu.manager.upload.MultipartFilePictureUpload;
 import com.snwolf.swtutu.manager.upload.UrlFilePictureUpload;
 import com.snwolf.swtutu.manager.upload.template.PictureFileUploadTemplate;
-import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
-import com.snwolf.swtutu.model.dto.picture.PictureReviewRequest;
-import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
-import com.snwolf.swtutu.model.dto.picture.UploadPictureResult;
+import com.snwolf.swtutu.model.dto.picture.*;
 import com.snwolf.swtutu.model.entity.Picture;
 import com.snwolf.swtutu.model.entity.User;
 import com.snwolf.swtutu.model.enums.PictureReviewStatusEnum;
@@ -30,10 +28,13 @@ import com.snwolf.swtutu.service.PictureService;
 import com.snwolf.swtutu.mapper.PictureMapper;
 import com.snwolf.swtutu.service.UserService;
 import com.snwolf.swtutu.utils.SFunctionUtils;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -216,6 +217,27 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
             // 普通用户默认为待审核状态
             picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
         }
+    }
+
+    @Override
+    public Integer UploadPictureByBatch(PictureUploadByBatchRequest pictureUploadByBatchRequest, HttpServletRequest request) {
+        // 校验参数
+        // 图片数量 <= 30
+        ThrowUtils.throwIf(pictureUploadByBatchRequest.getCount() > 30, ErrorCode.PARAMS_ERROR, "图片数量不能超过30");
+        // 抓取内容
+        String fetchUrl = String.format("https://cn.bing.com/images/async?q=%s&mmasync=1", pictureUploadByBatchRequest.getSearchText());
+        // 解析内容
+        Document document = null;
+        try {
+            document = Jsoup.connect(fetchUrl).get();
+        } catch (IOException e) {
+            log.error("图片抓取失败, e = {}", e);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "图片抓取失败");
+        }
+
+        // 上传图片
+
+        return 0;
     }
 }
 
