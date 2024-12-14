@@ -1,26 +1,27 @@
 package com.snwolf.swtutu.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.baomidou.mybatisplus.core.toolkit.ExceptionUtils;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.snwolf.swtutu.constant.CommonConstant;
+import com.snwolf.swtutu.constant.UserConstant;
 import com.snwolf.swtutu.exception.ErrorCode;
 import com.snwolf.swtutu.exception.ThrowUtils;
 import com.snwolf.swtutu.manager.FileManager;
 import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
+import com.snwolf.swtutu.model.dto.picture.PictureReviewRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
 import com.snwolf.swtutu.model.dto.picture.UploadPictureResult;
 import com.snwolf.swtutu.model.entity.Picture;
 import com.snwolf.swtutu.model.entity.User;
+import com.snwolf.swtutu.model.enums.PictureReviewStatusEnum;
 import com.snwolf.swtutu.model.vo.PictureVO;
 import com.snwolf.swtutu.model.vo.UserVO;
 import com.snwolf.swtutu.service.PictureService;
@@ -32,16 +33,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
-import java.lang.invoke.CallSite;
-import java.lang.invoke.LambdaMetafactory;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static cn.hutool.core.util.ClassUtil.getDeclaredField;
-import static java.lang.invoke.LambdaMetafactory.FLAG_SERIALIZABLE;
 
 /**
  * @author zhang
@@ -64,14 +57,16 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         // 校验图片
         validatePicture(multipartFile, request);
         // 判断是新增图片还是修改图片
+        User loginUser = userService.getLoginUser(request);
         Long picId = pictureUploadRequest.getId();
         if (ObjectUtil.isNotNull(picId)) {
             // 修改请求, 首先判断图片是否存在
             Picture picture = getById(picId);
             ThrowUtils.throwIf(ObjectUtil.isNull(picture), ErrorCode.NOT_FOUND_ERROR, "图片不存在");
+            // 改图片的审核状态
+            fillReviewParam(picture, loginUser);
         }
         // 构造数据库Picture对象
-        User loginUser = userService.getLoginUser(request);
         String uploadPathPrefix = "public/" + loginUser.getId();
         UploadPictureResult uploadPictureResult = fileManager.pictureFileUpload(multipartFile, uploadPathPrefix);
 
@@ -159,6 +154,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getPicScale()), Picture::getPicScale, pictureQueryRequest.getPicScale());
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getPicFormat()), Picture::getPicFormat, pictureQueryRequest.getPicFormat());
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getUserId()), Picture::getUserId, pictureQueryRequest.getUserId());
+        lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getReviewStatus()), Picture::getReviewStatus, pictureQueryRequest.getReviewStatus());
+        lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getReviewerId()), Picture::getReviewerId, pictureQueryRequest.getReviewerId());
+        lambdaQueryWrapper.eq(StrUtil.isNotBlank(pictureQueryRequest.getReviewMessage()), Picture::getReviewMessage, pictureQueryRequest.getReviewMessage());
         lambdaQueryWrapper.orderBy(ObjectUtil.isNotEmpty(pictureQueryRequest.getSortField()) && ObjectUtil.isNotEmpty(pictureQueryRequest.getSortOrder()),
                 pictureQueryRequest.getSortOrder().equals(CommonConstant.SORT_ORDER_ASC),
                 SFunctionUtils.getSFunction(Picture.class, pictureQueryRequest.getSortField()));
@@ -167,6 +165,9 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
 
     @Override
     public Page<PictureVO> getPictureVOPage(Page<Picture> picturePage) {
+        if(picturePage.getRecords().isEmpty()){
+            return new Page<>(picturePage.getCurrent(), picturePage.getSize());
+        }
         // 获取所有相关的userId, 统一查询user对象
         Set<Long> userIdList = picturePage.getRecords().stream().map(Picture::getUserId).collect(Collectors.toSet());
         List<User> users = userService.listByIds(userIdList);
@@ -178,6 +179,44 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         Page<PictureVO> pictureVOPage = new Page<>(picturePage.getCurrent(), picturePage.getSize(), picturePage.getTotal());
         pictureVOPage.setRecords(pictureVOList);
         return pictureVOPage;
+    }
+
+    @Override
+    public void doPictureReview(PictureReviewRequest pictureReviewRequest, User loginUser) {
+        // 校验参数
+        ThrowUtils.throwIf(ObjectUtil.isNull(pictureReviewRequest), ErrorCode.PARAMS_ERROR, "参数不能为空");
+        ThrowUtils.throwIf(!isAdmin(loginUser), ErrorCode.NO_AUTH_ERROR, "无操作权限");
+        // 判断图片是否存在
+        Picture picture = getById(pictureReviewRequest.getId());
+        ThrowUtils.throwIf(ObjectUtil.isNull(picture), ErrorCode.NOT_FOUND_ERROR, "图片不存在");
+        // 校验审核状态是否重复
+        ThrowUtils.throwIf(picture.getReviewStatus().equals(pictureReviewRequest.getReviewStatus()), ErrorCode.OPERATION_ERROR, "审核状态重复");
+        // 设置审核员id
+        pictureReviewRequest.setReviewerId(loginUser.getId());
+        // 数据库操作
+        Picture newPicture = new Picture();
+        BeanUtil.copyProperties(pictureReviewRequest, newPicture);
+        updateById(newPicture);
+    }
+
+    @Override
+    public boolean isAdmin(User user){
+        return ObjectUtil.isNotNull(user) && user.getUserRole().equals(UserConstant.ADMIN_ROLE);
+    }
+
+
+    @Override
+    public void fillReviewParam(Picture picture, User loginUser){
+        ThrowUtils.throwIf(ObjectUtil.isNull(loginUser), ErrorCode.PARAMS_ERROR, "用户未登录");
+        if(isAdmin(loginUser)){
+            // 管理员自动通过
+            picture.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
+            picture.setReviewerId(loginUser.getId());
+            picture.setReviewMessage("管理员自动通过");
+        }else{
+            // 普通用户默认为待审核状态
+            picture.setReviewStatus(PictureReviewStatusEnum.REVIEWING.getValue());
+        }
     }
 }
 

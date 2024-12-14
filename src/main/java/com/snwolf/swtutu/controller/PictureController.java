@@ -12,12 +12,10 @@ import com.snwolf.swtutu.constant.UserConstant;
 import com.snwolf.swtutu.exception.BusinessException;
 import com.snwolf.swtutu.exception.ErrorCode;
 import com.snwolf.swtutu.exception.ThrowUtils;
-import com.snwolf.swtutu.model.dto.picture.PictureEditRequest;
-import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
-import com.snwolf.swtutu.model.dto.picture.PictureUpdateRequest;
-import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
+import com.snwolf.swtutu.model.dto.picture.*;
 import com.snwolf.swtutu.model.entity.Picture;
 import com.snwolf.swtutu.model.entity.User;
+import com.snwolf.swtutu.model.enums.PictureReviewStatusEnum;
 import com.snwolf.swtutu.model.enums.UserRoleEnum;
 import com.snwolf.swtutu.model.vo.PictureVO;
 import com.snwolf.swtutu.request.DeleteRequest;
@@ -46,7 +44,7 @@ public class PictureController {
     private UserService userService;
 
     @PostMapping("/upload")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+//    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<PictureVO> upload(@RequestPart("file") MultipartFile multipartFile,
                                           PictureUploadRequest pictureUploadRequest,
                                           HttpServletRequest request) {
@@ -84,7 +82,7 @@ public class PictureController {
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest) {
+    public BaseResponse<Boolean> updatePicture(@RequestBody PictureUpdateRequest pictureUpdateRequest, HttpServletRequest request) {
         // 参数校验
         ThrowUtils.throwIf(ObjectUtil.isNull(pictureUpdateRequest), ErrorCode.PARAMS_ERROR, "参数不能为空");
         // 判断图片是否存在
@@ -95,6 +93,10 @@ public class PictureController {
         picture.setTags(JSONUtil.toJsonStr(pictureUpdateRequest.getTags()));
         // 图片校验
         pictureService.validateUpdatePicture(picture);
+        // 改图片的审核状态
+        User loginUser = userService.getLoginUser(request);
+        pictureService.fillReviewParam(picture, loginUser);
+        // 数据库更新
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "更新失败");
         return ResultUtils.success(true);
@@ -118,6 +120,7 @@ public class PictureController {
     @GetMapping("/get/vo")
     public BaseResponse<PictureVO> getPictureVOById(Long id) {
         ThrowUtils.throwIf(ObjectUtil.isNull(id) || id <= 0, ErrorCode.PARAMS_ERROR, "参数错误");
+        // TODO: 这里也要限制用户只能查看已经审核通过的照片
         return ResultUtils.success(pictureService.getPictureVOById(id));
     }
 
@@ -144,6 +147,8 @@ public class PictureController {
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<PictureVO>> listPictureVOByPage(@RequestBody PictureQueryRequest pictureQueryRequest) {
         ThrowUtils.throwIf(ObjectUtil.isNull(pictureQueryRequest), ErrorCode.PARAMS_ERROR, "参数错误");
+        // 限制普通用户只能访问已通过审核的图片
+        pictureQueryRequest.setReviewStatus(PictureReviewStatusEnum.PASS.getValue());
         Page<Picture> picturePage = pictureService.page(new Page<>(pictureQueryRequest.getCurrent(), pictureQueryRequest.getPageSize()),
                 pictureService.getQueryWrapper(pictureQueryRequest));
         return ResultUtils.success(pictureService.getPictureVOPage(picturePage));
@@ -167,12 +172,21 @@ public class PictureController {
         ThrowUtils.throwIf(ObjectUtil.isNull(oldPicture), ErrorCode.NOT_FOUND_ERROR, "图片不存在");
         // 仅本人或管理员可编辑
         User loginUser = userService.getLoginUser(request);
-        if(!loginUser.getUserRole().equals(UserRoleEnum.ADMIN.getValue()) && loginUser.getId() != oldPicture.getUserId()){
+        if (!loginUser.getUserRole().equals(UserRoleEnum.ADMIN.getValue()) && loginUser.getId() != oldPicture.getUserId()) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限");
-        }
+        }// 改图片的审核状态
+        pictureService.fillReviewParam(picture, loginUser);
         // 更新数据库
         boolean result = pictureService.updateById(picture);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR, "更新失败");
+        return ResultUtils.success(true);
+    }
+
+    @PostMapping("/review")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> pictureReview(@RequestBody PictureReviewRequest pictureReviewRequest, HttpServletRequest request){
+        ThrowUtils.throwIf(ObjectUtil.isNull(pictureReviewRequest), ErrorCode.PARAMS_ERROR, "参数错误");
+        pictureService.doPictureReview(pictureReviewRequest, userService.getLoginUser(request));
         return ResultUtils.success(true);
     }
 }

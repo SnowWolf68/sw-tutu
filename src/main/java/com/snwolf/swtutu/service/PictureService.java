@@ -3,9 +3,11 @@ package com.snwolf.swtutu.service;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
+import com.snwolf.swtutu.model.dto.picture.PictureReviewRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
 import com.snwolf.swtutu.model.entity.Picture;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.snwolf.swtutu.model.entity.User;
 import com.snwolf.swtutu.model.vo.PictureVO;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -65,4 +67,30 @@ public interface PictureService extends IService<Picture> {
      * @return
      */
     Page<PictureVO> getPictureVOPage(Page<Picture> picturePage);
+
+    /**
+     * 图片审核
+     *
+     * @param pictureReviewRequest
+     * @param loginUser
+     */
+    void doPictureReview(PictureReviewRequest pictureReviewRequest, User loginUser);
+
+    /**
+     * 判断当前用户是否是管理员
+     *
+     * @param user
+     * @return
+     */
+    boolean isAdmin(User user);
+
+    /**
+     * 上传图片时更新图片审核参数
+     *  1. 管理员自动过审
+     *  2. 普通用户默认是 待审核 状态
+     *
+     * @param picture
+     * @param loginUser
+     */
+    void fillReviewParam(Picture picture, User loginUser);
 }
