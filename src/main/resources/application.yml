@@ -7,9 +7,9 @@ spring:
     name: sw-tutu
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/tutu
+    url: jdbc:mysql://222.79.104.69:3306/tutu
     username: root
-    password: 12345678
+    password: 12345678qwer
   profiles:
     active: local
   servlet:

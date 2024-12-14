@@ -26,6 +26,7 @@ import com.snwolf.swtutu.model.vo.UserVO;
 import com.snwolf.swtutu.service.PictureService;
 import com.snwolf.swtutu.mapper.PictureMapper;
 import com.snwolf.swtutu.service.UserService;
+import com.snwolf.swtutu.utils.SFunctionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -158,42 +159,10 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getPicScale()), Picture::getPicScale, pictureQueryRequest.getPicScale());
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getPicFormat()), Picture::getPicFormat, pictureQueryRequest.getPicFormat());
         lambdaQueryWrapper.eq(ObjectUtil.isNotEmpty(pictureQueryRequest.getUserId()), Picture::getUserId, pictureQueryRequest.getUserId());
-//        lambdaQueryWrapper.orderBy(ObjectUtil.isNotEmpty(pictureQueryRequest.getSortField()),
-//                pictureQueryRequest.getSortOrder().equals(CommonConstant.SORT_ORDER_ASC),
-//                getSFunction(Picture.class, pictureQueryRequest.getSortField()));
+        lambdaQueryWrapper.orderBy(ObjectUtil.isNotEmpty(pictureQueryRequest.getSortField()) && ObjectUtil.isNotEmpty(pictureQueryRequest.getSortOrder()),
+                pictureQueryRequest.getSortOrder().equals(CommonConstant.SORT_ORDER_ASC),
+                SFunctionUtils.getSFunction(Picture.class, pictureQueryRequest.getSortField()));
         return lambdaQueryWrapper;
-    }
-
-    /**
-     * 获取方法的sfunction
-     * @param entityClass 实体类
-     * @param fieldName 字段名
-     * @return sfunction
-     */
-    public static SFunction getSFunction(Class<?> entityClass, String fieldName) {
-        Map<String, SFunction> functionMap = new HashMap<>();
-        Field field = getDeclaredField(entityClass, fieldName);
-        if(field == null){
-            throw ExceptionUtils.mpe("This class %s is not have field %s ", entityClass.getName(), fieldName);
-        }
-        SFunction func = null;
-        final MethodHandles.Lookup lookup = MethodHandles.lookup();
-        MethodType methodType = MethodType.methodType(field.getType(), entityClass);
-        final CallSite site;
-        String getFunName = "get" + fieldName.substring(0, 1).toUpperCase() + fieldName.substring(1);
-        try {
-            site = LambdaMetafactory.altMetafactory(lookup,
-                    "invoke",
-                    MethodType.methodType(SFunction.class),
-                    methodType,
-                    lookup.findVirtual(entityClass, getFunName, MethodType.methodType(field.getType())),
-                    methodType, FLAG_SERIALIZABLE);
-            func = (SFunction) site.getTarget().invokeExact();
-            functionMap.put(entityClass.getName() + field, func);
-            return func;
-        } catch (Throwable e) {
-            throw ExceptionUtils.mpe("This class %s is not have method %s ", entityClass.getName(), getFunName);
-        }
     }
 
     @Override
