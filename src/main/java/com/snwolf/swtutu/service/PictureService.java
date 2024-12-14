@@ -23,21 +23,13 @@ public interface PictureService extends IService<Picture> {
 
     /**
      * 上传图片
-     * @param multipartFile 前端提交的图片对象
+     * @param inputSource 上传的图片来源
      * @param pictureUploadRequest 有可能是更新图片请求, 那么request携带图片id
      * @param request 用于获取上传图片的用户
      * @return
      */
-    PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest,
+    PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest,
                             HttpServletRequest request);
-
-    /**
-     * 校验图片
-     *
-     * @param multipartFile
-     * @return
-     */
-    void validatePicture(MultipartFile multipartFile, HttpServletRequest request);
 
     /**
      * 校验更新的图片是否符合要求

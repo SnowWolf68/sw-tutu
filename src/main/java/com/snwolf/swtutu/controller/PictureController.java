@@ -53,6 +53,22 @@ public class PictureController {
     }
 
     /**
+     * 通过url上传
+     *
+     * @param fileUrl
+     * @param pictureUploadRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/upload/url")
+    public BaseResponse<PictureVO> uploadPictureByUrl(@RequestParam("url") String fileUrl,
+                                                       PictureUploadRequest pictureUploadRequest,
+                                                       HttpServletRequest request) {
+        PictureVO pictureVO = pictureService.uploadPicture(fileUrl, pictureUploadRequest, request);
+        return ResultUtils.success(pictureVO);
+    }
+
+    /**
      * 删除图片
      *
      * @param deleteRequest

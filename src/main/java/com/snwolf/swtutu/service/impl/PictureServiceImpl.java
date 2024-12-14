@@ -3,7 +3,6 @@ package com.snwolf.swtutu.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateTime;
-import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.Wrapper;
@@ -15,6 +14,9 @@ import com.snwolf.swtutu.constant.UserConstant;
 import com.snwolf.swtutu.exception.ErrorCode;
 import com.snwolf.swtutu.exception.ThrowUtils;
 import com.snwolf.swtutu.manager.FileManager;
+import com.snwolf.swtutu.manager.upload.MultipartFilePictureUpload;
+import com.snwolf.swtutu.manager.upload.UrlFilePictureUpload;
+import com.snwolf.swtutu.manager.upload.template.PictureFileUploadTemplate;
 import com.snwolf.swtutu.model.dto.picture.PictureQueryRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureReviewRequest;
 import com.snwolf.swtutu.model.dto.picture.PictureUploadRequest;
@@ -29,7 +31,6 @@ import com.snwolf.swtutu.mapper.PictureMapper;
 import com.snwolf.swtutu.service.UserService;
 import com.snwolf.swtutu.utils.SFunctionUtils;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
@@ -51,13 +52,19 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
     @Resource
     private FileManager fileManager;
 
+    @Resource
+    private MultipartFilePictureUpload multipartFilePictureUpload;
+
+    @Resource
+    private UrlFilePictureUpload urlFilePictureUpload;
+
     @Override
-    public PictureVO uploadPicture(MultipartFile multipartFile, PictureUploadRequest pictureUploadRequest,
+    public PictureVO uploadPicture(Object inputSource, PictureUploadRequest pictureUploadRequest,
                                    HttpServletRequest request) {
-        // 校验图片
-        validatePicture(multipartFile, request);
-        // 判断是新增图片还是修改图片
+        // 只有登录用户才能上传图片
         User loginUser = userService.getLoginUser(request);
+        ThrowUtils.throwIf(ObjectUtil.isNull(loginUser), ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        // 判断是新增图片还是修改图片
         Long picId = pictureUploadRequest.getId();
         if (ObjectUtil.isNotNull(picId)) {
             // 修改请求, 首先判断图片是否存在
@@ -68,7 +75,13 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         }
         // 构造数据库Picture对象
         String uploadPathPrefix = "public/" + loginUser.getId();
-        UploadPictureResult uploadPictureResult = fileManager.pictureFileUpload(multipartFile, uploadPathPrefix);
+
+        PictureFileUploadTemplate pictureFileUploadTemplate = multipartFilePictureUpload;
+        if (inputSource instanceof String) {
+            pictureFileUploadTemplate = urlFilePictureUpload;
+        }
+
+        UploadPictureResult uploadPictureResult = pictureFileUploadTemplate.pictureFileUpload(inputSource, uploadPathPrefix);
 
         Picture picture = new Picture();
         picture.setName(uploadPictureResult.getPicName());
@@ -89,20 +102,6 @@ public class PictureServiceImpl extends ServiceImpl<PictureMapper, Picture>
         PictureVO pictureVO = PictureVO.objToVO(picture);
         pictureVO.setUser(UserVO.objToVO(loginUser));
         return pictureVO;
-    }
-
-    public void validatePicture(MultipartFile multipartFile, HttpServletRequest request) {
-        // 只有登录用户才有权限上传
-        ThrowUtils.throwIf(ObjectUtil.isNull(userService.getLoginUser(request)), ErrorCode.NO_AUTH_ERROR, "未登录");
-        ThrowUtils.throwIf(ObjectUtil.isNull(multipartFile), ErrorCode.PARAMS_ERROR, "上传图片不能为空");
-        // 图片大小不能超过 2MB
-        final int SIZE = 1024 * 1024 * 2;
-        ThrowUtils.throwIf(multipartFile.getSize() > SIZE, ErrorCode.PARAMS_ERROR, "上传图片大小不能超过 2MB");
-        // 校验文件后缀
-        String fileName = multipartFile.getOriginalFilename();
-        String suffix = FileUtil.getSuffix(fileName);
-        final List<String> ALLOW_FORMAT_LIST = Arrays.asList("jpg", "jpeg", "png");
-        ThrowUtils.throwIf(!ALLOW_FORMAT_LIST.contains(suffix), ErrorCode.PARAMS_ERROR, "上传图片格式不正确");
     }
 
     @Override
